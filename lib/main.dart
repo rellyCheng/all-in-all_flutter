@@ -1,102 +1,97 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:all_in_all/pages/randomWords.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:all_in_all/common/component_index.dart';
+import 'package:all_in_all/data/net/dio_util.dart';
+import 'package:all_in_all/ui/pages/main_page.dart';
+import 'package:all_in_all/ui/pages/page_index.dart';
 
-void main() => runApp(MyApp());
+void main() => runApp(BlocProvider<ApplicationBloc>(
+      bloc: ApplicationBloc(),
+      child: BlocProvider(child: MyApp(), bloc: MainBloc()),
+    ));
 
-class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
+class MyApp extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-        //注册路由表
-      routes:{
-      "new_page":(context)=>RandomWordsWidget(),
-      } ,
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
-    );
+  State<StatefulWidget> createState() {
+    return MyAppState();
   }
 }
 
+class MyAppState extends State<MyApp> {
+  Locale _locale;
+  Color _themeColor = Colours.app_main;
 
-class NewRoute extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("New route"),
-      ),
-      body: Center(
-        child: Text("This is new route"),
-      ),
-    );
+  void initState() {
+    super.initState();
+    setLocalizedValues(localizedValues);
+    _init();
+    _initAsync();
+    _initListener();
   }
-}
 
+  void _init() {
+//    DioUtil.openDebug();
+    Options options = DioUtil.getDefOptions();
+    options.baseUrl = Constant.server_address;
+    HttpConfig config = new HttpConfig(options: options);
+    DioUtil().setConfig(config);
+  }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+  void _initAsync() async {
+    await SpUtil.getInstance();
+    if (!mounted) return;
+    _loadLocale();
+  }
 
-  final String title;
+  void _initListener() {
+    final ApplicationBloc bloc = BlocProvider.of<ApplicationBloc>(context);
+    bloc.appEventStream.listen((value) {
+      _loadLocale();
+    });
+  }
 
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
+  void _loadLocale() {
     setState(() {
-      _counter++;
+      LanguageModel model =
+          SpHelper.getObject<LanguageModel>(Constant.keyLanguage);
+      if (model != null) {
+        _locale = new Locale(model.languageCode, model.countryCode);
+      } else {
+        _locale = null;
+      }
+
+      String _colorKey = SpHelper.getThemeColor();
+      if (themeColorMap[_colorKey] != null)
+        _themeColor = themeColorMap[_colorKey];
     });
   }
 
   @override
-  Widget build(BuildContext context) {
+  void dispose() {
+    super.dispose();
+  }
 
-    return Scaffold(
-      appBar: AppBar(
-     
-        title: Text(widget.title),
+  @override
+  Widget build(BuildContext context) {
+    return new MaterialApp(
+      routes: {
+        '/MainPage': (ctx) => MainPage(),
+      },
+      home: new SplashPage(),
+      theme: ThemeData.light().copyWith(
+        primaryColor: _themeColor,
+        accentColor: _themeColor,
+        indicatorColor: Colors.white,
       ),
-      body: Center(
-     
-        child: Column(
-        
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.display3,
-            ),
-            FlatButton(
-              child: Text("open new route"),
-              textColor: Colors.blue,
-              onPressed: () {
-                //导航到新路由   
-                // Navigator.push( context,
-                // new MaterialPageRoute(
-                //   builder: (context) { return new NewRoute();},
-                //   maintainState:false
-                //   ));
-                Navigator.pushNamed(context, "new_page");
-                },
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      locale: _locale,
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        CustomLocalizations.delegate
+      ],
+      supportedLocales: CustomLocalizations.supportedLocales,
     );
   }
 }
